@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Boolean
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, SelectField
+from wtforms import StringField, SubmitField, SelectField, BooleanField
 from wtforms.validators import DataRequired, URL
 
 app = Flask(__name__)
@@ -41,7 +41,18 @@ with app.app_context():
     db.create_all()
 
 class ParkForm(FlaskForm):
-    park = StringField('Park name', validators=[DataRequired()])
+    park_name = StringField('Park name', validators=[DataRequired()])
+    location =StringField('Park Location on Google Maps(URL)',validators=[DataRequired(),URL()])
+    has_wc = BooleanField('Is there a WC?',validators=[DataRequired()])
+    has_shop = BooleanField('Is there a Shop?',validators=[DataRequired()])
+    has_sport_area= BooleanField('Is there a sport equipments for adult?',validators=[DataRequired()])
+    playground_condition = SelectField('Playground Condition Rating',choices=[(1,'🔧'),(2,'🔧🔧'),(3,'🔧🔧🔧'),(4,'🔧🔧🔧🔧'),(5,'🔧🔧🔧🔧🔧')],validators=[DataRequired()])
+    playground_variety = SelectField('Playground Variety Rating',choices=[(1,'⭐'),(2,'⭐⭐'),(3,'⭐⭐⭐'),(4,'⭐⭐⭐⭐'),(5,'⭐⭐⭐⭐⭐')],validators=[DataRequired()])
+    security = SelectField('How secure is the Park?',choices=[(1,'🛡️'),(2,'🛡️🛡️'),(3,'🛡️🛡️🛡️'),(4,'🛡️🛡️🛡️🛡️'),(5,'🛡️🛡️🛡️🛡️🛡️')],validators=[DataRequired()])
+    tree_coverage = SelectField('Tree coverage in the Park?',choices=[(1,'🌳'),(2,'🌳🌳'),(3,'🌳🌳🌳'),(4,'🌳🌳🌳🌳'),(5,'🌳🌳🌳🌳🌳')],validators=[DataRequired()])
+    img_url=StringField('Do you have a photo link for the park?',validators=[URL()])
+    submit = SubmitField('Submit')
+
 
 @app.route('/')
 def index():
