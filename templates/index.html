@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Child-Friendly Park Finder{% endblock %}
+
+{% block content %}
+<div class="jumbotron text-center">
+  <div class="container">
+    <h1 class="display-4">🌳Child-Friendly Park Finder 🛝</h1>
+    <p class="lead">Discover parks that suit you and your child.</p>
+    <hr class="my-4" />
+    <p>
+      With our AI-powered recommendation system, we’ll find the best parks based on your child’s age and needs! 🤖🧒
+    </p>
+    <a
+      class="btn btn-warning btn-lg"
+      href="{{ url_for('parks') }}"
+      role="button"
+      >Show Me!👀</a
+    >
+      <a
+      class="btn btn-warning btn-lg"
+      href="{{ url_for('chat') }}"
+      role="button"
+      >Chat AI!🤖</a
+    >
+  </div>
+</div>
+
+{% endblock %}
