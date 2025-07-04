@@ -13,12 +13,11 @@ class Base(DeclarativeBase):
   pass
 
 db = SQLAlchemy(model_class=Base)
-db.init_app(app)
 
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parks.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+db.init_app(app)
 bootstrap = Bootstrap5(app)
 
 class Park(db.Model):
@@ -58,11 +57,36 @@ class ParkForm(FlaskForm):
 def index():
     return render_template('index.html')
 
+@app.route('/add_park',methods = ['GET','POST'])
+def add_park():
+    form = ParkForm()
+    if form.validate_on_submit():
+        new_park = Park(
+            name=form.park_name.data,
+            map_url = form.location.data,
+            has_wc = form.has_wc.data,
+            has_shop = form.has_shop.data,
+            has_sport_area = form.has_sport_area.data,
+            playground_condition = form.playground_condition.data,
+            playground_variety= form.playground_variety.data,
+            security = form.security.data,
+            tree_coverage = form.tree_coverage.data,
+            img_url = form.img_url.data if form.img_url.data else None
+        )
+        db.session.add(new_park)
+        db.session.commit()
+        return redirect(url_for('parks'))
+    return render_template('add_park.html',form=form)
+
 @app.route('/parks')
 def parks():
-    return render_template('parks.html')
+    result = db.session.execute(db.select(Park).order_by(Park.name))
+    all_parks = result.scalars().all()
+    return render_template('parks.html',parks=all_parks)
+
 @app.route('/chat')
 def chat():
     return render_template('chat.html')
+
 if __name__ == '__main__':
   app.run(debug=True)
