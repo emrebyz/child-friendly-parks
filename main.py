@@ -1,11 +1,16 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for,flash
 from flask_bootstrap import Bootstrap5
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Boolean
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, SelectField, BooleanField
-from wtforms.validators import DataRequired, URL
+from wtforms.fields.simple import PasswordField
+from wtforms.validators import DataRequired, URL, Email
+from werkzeug.security import generate_password_hash,check_password_hash
+from flask_login import LoginManager,UserMixin,login_user,login_required,current_user,logout_user
+import os
+
 
 app = Flask(__name__)
 
@@ -19,6 +24,23 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parks.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 bootstrap = Bootstrap5(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view= 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User,int(user_id))
+
+class User(db.Model,UserMixin):
+    __tablename__ = 'users'
+    id : Mapped[int] = mapped_column(Integer,primary_key=True)
+    email : Mapped[str] = mapped_column(String(100),unique=True,nullable=False)
+    password : Mapped[str] = mapped_column(String(100),nullable=False)
+    name : Mapped[str] =mapped_column(String(100),nullable=False)
+with app.app_context():
+    db.create_all()
 
 class Park(db.Model):
     __tablename__ = 'parks'
@@ -39,6 +61,12 @@ class Park(db.Model):
 with app.app_context():
     db.create_all()
 
+class LoginForm(FlaskForm):
+    email = StringField('Email',validators=[DataRequired(),Email()])
+    password = PasswordField('Password',validators=[DataRequired()])
+    submit = SubmitField('Login')
+
+
 class ParkForm(FlaskForm):
     park_name = StringField('Park name', validators=[DataRequired()])
     location =StringField('Park Location on Google Maps(URL)',validators=[DataRequired(),URL()])
@@ -56,6 +84,26 @@ class ParkForm(FlaskForm):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/login',methods=['GET','POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+        user = db.session.execute(db.select(User).where(User.email == email)).scalar()
+        if not user:
+            flash('No user found with this email address. Please try again.')
+            return redirect(url_for('login'))
+        elif not check_password_hash(user.password,password):
+            flash('Wrong password, please try again.')
+            return redirect(url_for('login'))
+        else:
+            login_user(user)
+            flash('Login Successfully!')
+            return redirect(url_for('parks'))
+    return render_template('login.html',form=form)
+
 
 @app.route('/add_park',methods = ['GET','POST'])
 def add_park():
@@ -83,6 +131,10 @@ def parks():
     result = db.session.execute(db.select(Park).order_by(Park.name))
     all_parks = result.scalars().all()
     return render_template('parks.html',parks=all_parks)
+
+@app.route('/edit_park')
+def edit_park():
+    pass
 
 @app.route('/chat')
 def chat():
