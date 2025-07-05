@@ -68,11 +68,11 @@ class LoginForm(FlaskForm):
 
 
 class ParkForm(FlaskForm):
-    park_name = StringField('Park name', validators=[DataRequired()])
-    location =StringField('Park Location on Google Maps(URL)',validators=[DataRequired(),URL()])
-    has_wc = BooleanField('Is there a WC?',validators=[DataRequired()])
-    has_shop = BooleanField('Is there a Shop?',validators=[DataRequired()])
-    has_sport_area= BooleanField('Is there a sport equipments for adult?',validators=[DataRequired()])
+    name = StringField('Park name', validators=[DataRequired()])
+    map_url =StringField('Park Location on Google Maps(URL)',validators=[DataRequired(),URL()])
+    has_wc = BooleanField('Is there a WC?')
+    has_shop = BooleanField('Is there a Shop?')
+    has_sport_area= BooleanField('Is there a sport equipments for adult?')
     playground_condition = SelectField('Playground Condition Rating',choices=[(1,'🔧'),(2,'🔧🔧'),(3,'🔧🔧🔧'),(4,'🔧🔧🔧🔧'),(5,'🔧🔧🔧🔧🔧')],validators=[DataRequired()],coerce=int)
     playground_variety = SelectField('Playground Variety Rating',choices=[(1,'⭐'),(2,'⭐⭐'),(3,'⭐⭐⭐'),(4,'⭐⭐⭐⭐'),(5,'⭐⭐⭐⭐⭐')],validators=[DataRequired()],coerce=int)
     security = SelectField('How secure is the Park?',choices=[(1,'🛡️'),(2,'🛡️🛡️'),(3,'🛡️🛡️🛡️'),(4,'🛡️🛡️🛡️🛡️'),(5,'🛡️🛡️🛡️🛡️🛡️')],validators=[DataRequired()],coerce=int)
@@ -104,14 +104,19 @@ def login():
             return redirect(url_for('parks'))
     return render_template('login.html',form=form)
 
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 @app.route('/add_park',methods = ['GET','POST'])
 def add_park():
     form = ParkForm()
     if form.validate_on_submit():
         new_park = Park(
-            name=form.park_name.data,
-            map_url = form.location.data,
+            name=form.name.data,
+            map_url = form.map_url.data,
             has_wc = form.has_wc.data,
             has_shop = form.has_shop.data,
             has_sport_area = form.has_sport_area.data,
@@ -132,9 +137,43 @@ def parks():
     all_parks = result.scalars().all()
     return render_template('parks.html',parks=all_parks)
 
-@app.route('/edit_park')
-def edit_park():
-    pass
+@app.route('/edit_park/<int:park_id>',methods = ['GET','POST'])
+def edit_park(park_id):
+    park_to_edit = db.session.get(Park,park_id)
+    if not park_to_edit:
+        flash('Park not found.')
+        return redirect(url_for('parks'))
+    form = ParkForm(obj=park_to_edit)
+
+    if form.validate_on_submit():
+        if current_user.is_authenticated:
+            park_to_edit.name = form.name.data
+            park_to_edit.map_url=form.map_url.data
+            park_to_edit.has_wc=form.has_wc.data
+            park_to_edit.has_shop=form.has_shop.data
+            park_to_edit.has_sport_area=form.has_sport_area.data
+            park_to_edit.playground_condition=form.playground_condition.data
+            park_to_edit.playground_variety=form.playground_variety.data
+            park_to_edit.security=form.security.data
+            park_to_edit.tree_coverage=form.tree_coverage.data
+            park_to_edit.img_url=form.img_url.data if form.img_url.data else None
+            db.session.commit()
+            return redirect(url_for('parks'))
+        else:
+            flash('buraya suggestion mail gelecek')
+            return redirect(url_for('parks'))
+    return render_template('edit_park.html',form = form,park=park_to_edit,logged_in=current_user.is_authenticated)
+
+@app.route('/delete_park/<int:park_id>',methods=['POST'])
+@login_required
+def delete_park(park_id):
+    park_to_delete = db.session.get(Park,park_id)
+    db.session.delete(park_to_delete)
+    db.session.commit()
+    flash(f"'{park_to_delete.name}' deleted successfully.")
+    return redirect(url_for('parks'))
+
+
 
 @app.route('/chat')
 def chat():
