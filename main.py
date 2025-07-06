@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash,check_password_hash
 from flask_login import LoginManager,UserMixin,login_user,login_required,current_user,logout_user
 import os,json
 from dotenv import load_dotenv
+from flask_mail import Mail,Message
 
 load_dotenv()
 
@@ -25,8 +26,14 @@ db = SQLAlchemy(model_class=Base)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 db.init_app(app)
 bootstrap = Bootstrap5(app)
+mail = Mail(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -96,14 +103,14 @@ def login():
         password = form.password.data
         user = db.session.execute(db.select(User).where(User.email == email)).scalar()
         if not user:
-            flash('No user found with this email address. Please try again.')
+            flash('No user found with this email address. Please try again.','danger')
             return redirect(url_for('login'))
         elif not check_password_hash(user.password,password):
-            flash('Wrong password, please try again.')
+            flash('Wrong password, please try again.','danger')
             return redirect(url_for('login'))
         else:
             login_user(user)
-            flash('Login Successfully!')
+            flash('Login Successfully!','success')
             return redirect(url_for('parks'))
     return render_template('login.html',form=form)
 
@@ -144,7 +151,7 @@ def parks():
 def edit_park(park_id):
     park_to_edit = db.session.get(Park,park_id)
     if not park_to_edit:
-        flash('Park not found.')
+        flash('Park not found.','danger')
         return redirect(url_for('parks'))
     form = ParkForm(obj=park_to_edit)
 
@@ -163,7 +170,32 @@ def edit_park(park_id):
             db.session.commit()
             return redirect(url_for('parks'))
         else:
-            flash('buraya suggestion mail gelecek')
+            try:
+                msg = Message(
+                    subject=f'Park suggestion: {park_to_edit.name}',
+                    sender=app.config['MAIL_USERNAME'],
+                    recipients=[os.environ.get('MAIL_RECIPIENTS')]
+                )
+                msg.body=f"""
+                Park ID: {park_id}
+                Park Name: {park_to_edit.name}
+                Suggested changes:
+                -Park Name: {form.name.data}
+                -Map URL: {form.map_url.data}
+                -Is there a WC?: {form.has_wc.data}
+                -Is there a Shop?: {form.has_shop.data}
+                -Is there a sport area?: {form.has_sport_area.data}
+                -Playground condition rating: {form.playground_condition.data}
+                -Playground variert rating: {form.playground_variety.data}
+                -Security rating: {form.security.data}
+                -Tree coverage rating: {form.tree_coverage.data}
+                -Photo URL: {form.img_url.data}
+                """
+                mail.send(msg)
+                flash('Your suggestion has been successfully submitted! It will be updated after review.','info')
+            except Exception as e:
+                flash('An error occurred while sending the email.','danger')
+                print(f"Mail error: {e}")
             return redirect(url_for('parks'))
     return render_template('edit_park.html',form = form,park=park_to_edit,logged_in=current_user.is_authenticated)
 
@@ -173,7 +205,7 @@ def delete_park(park_id):
     park_to_delete = db.session.get(Park,park_id)
     db.session.delete(park_to_delete)
     db.session.commit()
-    flash(f"'{park_to_delete.name}' deleted successfully.")
+    flash(f"'{park_to_delete.name}' deleted successfully.",'success')
     return redirect(url_for('parks'))
 
 
