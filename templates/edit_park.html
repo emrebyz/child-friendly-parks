@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Edit Park{% endblock %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-sm-12 col-md-8">
+        {% if logged_in %}
+      <h1>Edit {{ park.name }} into the database</h1>
+        {% else %}}
+      <h1>Make suggestion {{ park.name }} into the admin</h1>
+        {% endif %}
+
+       {{ wtf.quick_form(form) }}
+
+      <p class="space-above">
+        <a href="{{ url_for('parks') }}">See all parks</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
