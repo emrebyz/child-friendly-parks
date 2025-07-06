@@ -9,7 +9,10 @@ from wtforms.fields.simple import PasswordField
 from wtforms.validators import DataRequired, URL, Email
 from werkzeug.security import generate_password_hash,check_password_hash
 from flask_login import LoginManager,UserMixin,login_user,login_required,current_user,logout_user
-import os
+import os,json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 app = Flask(__name__)
@@ -19,8 +22,8 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
-app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parks.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 bootstrap = Bootstrap5(app)
@@ -178,6 +181,48 @@ def delete_park(park_id):
 @app.route('/chat')
 def chat():
     return render_template('chat.html')
+
+# API func's
+
+@app.route('/api/all')
+def get_all_parks():
+    result =db.session.execute(db.select(Park))
+    all_parks =result.scalars().all()
+    return jsonify(parks=[park.to_dict() for park in all_parks])
+
+@app.route('/api/add',methods = ['POST'])
+def post_new_park():
+    new_park=Park(
+        name=request.form.get('name'),
+        map_url = request.form.get('map_url'),
+        has_wc = bool(request.form.get('has_wc')),
+        has_shop = bool(request.form.get('has_shop')),
+        has_sport_area = bool(request.form.get('has_sport_area')),
+        playground_condition = request.form.get('playground_condition'),
+        playground_variety= request.form.get('playground_variety'),
+        security = request.form.get('security'),
+        tree_coverage = request.form.get('tree_coverage'),
+        img_url = request.form.get('img_url') if request.form.get('img_url') else None,
+    )
+    db.session.add(new_park)
+    db.session.commit()
+    return jsonify(response={'success':'Successfully added the new park.'}),201
+
+@app.route('/api/update/<int:park_id>',methods=['PATCH'])
+def update_park(park_id):
+    try:
+        park = Park.query.get(park_id)
+        if not park:
+            return jsonify(error={'Not found':'Park not found.'}),404
+        for key,value in request.json.items():
+            if hasattr(park,key):
+                setattr(park,key,value)
+        db.session.commit()
+        return jsonify(response={'success':'Park updated successfully.'}),200
+    except Exception as e:
+        return jsonify(error={'Database Error':str(e)}), 500
+
+
 
 if __name__ == '__main__':
   app.run(debug=True)
