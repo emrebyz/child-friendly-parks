@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for,flash
+from flask import session as flask_session
 from flask_bootstrap import Bootstrap5
 from flask_sqlalchemy import SQLAlchemy
+from requests import session
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Boolean
 from flask_wtf import FlaskForm
@@ -9,19 +11,25 @@ from wtforms.fields.simple import PasswordField
 from wtforms.validators import DataRequired, URL, Email
 from werkzeug.security import generate_password_hash,check_password_hash
 from flask_login import LoginManager,UserMixin,login_user,login_required,current_user,logout_user
-import os,json
+import os
 from dotenv import load_dotenv
 from flask_mail import Mail,Message
+import google.generativeai as genai
 
 load_dotenv()
-
+GEMINI_API_KEY= os.environ.get('GEMINI_API_KEY')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print('Warning: GEMINI_API_KEY not found in environment variables. AI chat will not work.')
 
 app = Flask(__name__)
-
+app.secret_key=os.environ.get('SECRET_KEY')
 class Base(DeclarativeBase):
   pass
 
 db = SQLAlchemy(model_class=Base)
+
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
@@ -210,9 +218,56 @@ def delete_park(park_id):
 
 
 
-@app.route('/chat')
-def chat():
-    return render_template('chat.html')
+@app.route('/chat',methods=['GET','POST'])
+def chat_page():
+
+    if 'chat_history' not in flask_session:
+        flask_session['chat_history'] = []
+
+    user_question = None
+    if request.method== 'POST':
+        user_question=request.form.get('user_question')
+
+        if user_question:
+            flask_session['chat_history'].append({'sender':'user','message':user_question})
+
+            if not GEMINI_API_KEY:
+                ai_answer = 'AI API key is not configured.'
+            else:
+                try:
+                    all_parks = db.session.execute(db.select(Park)).scalars().all()
+                    parks_info = '\n'.join([
+                        f"- {park.name} (ID: {park.id}): Wc: {'Yes' if park.has_wc else 'No'}, Shop: {'Yes' if park.has_shop else 'No'},"
+                        f"Sport Area: {'Yes' if park.has_sport_area else 'No'},Playgroun Condition: {park.playground_condition}/5,Tree coverage: {park.tree_coverage}/5,"
+                        f"Security: {park.security}/5" for park in all_parks
+                    ])
+                    prompt=(
+                            "You are a child-friendly park information assistant. Do not answer questions other than the park information provided to you and focus only on questions about these parks. "
+
+                            "The following park information is available:\n\n"
+                            f"{parks_info}\n\n"
+                            "You can ask me questions about these parks. Do not answer general information or other topics. "
+                            "Try to answer questions using the park name or ID. For example, you can ask questions like 'Ayşe Park has a restroom?' or 'What is the security status of park ID 5?'.\n\n"
+                            f"User's question: {user_question}"
+                        )
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    response = model.generate_content(prompt)
+                    ai_answer= response.text
+
+                except Exception as e:
+                    print(f"Gemini API error: {e}")
+                    ai_answer="Sorry, I can't respond right now. Please try again later."
+
+            flask_session['chat_history'].append({'sender':'ai', 'message':ai_answer})
+
+            flask_session.permanent = True
+            flask_session.modified = True
+            return redirect(url_for('chat_page'))
+
+    return render_template('chat.html',chat_history = flask_session.get('chat_history'),user_question = user_question)
+
+
+
 
 # API func's
 

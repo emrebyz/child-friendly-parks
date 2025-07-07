@@ -1,10 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block title %}AI Chat - Park Information{% endblock %}
 
-</body>
-</html>
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow-sm" style="background-color: #f0f8f0; color: #333;">
+        <div class="card-header text-center" style="background-color: #5fb979; color: white;">
+            <h3>Park Information Assistant (AI Chat)</h3>
+            <p class="mb-0">You can ask your questions about our parks here.</p>
+        </div>
+        <div class="card-body" id="chat-box" style="height: 400px; overflow-y: auto; border-bottom: 1px solid #ddd; padding: 15px;">
+
+            {% if chat_history %}
+                {% for entry in chat_history %}
+
+                    {% if entry.sender == 'user' %}
+                        <div class="alert alert-secondary mb-2 text-end">
+                            <strong>You:</strong> {{ entry.message }}
+                        </div>
+                    {% elif entry.sender == 'ai' %}
+                        <div class="alert alert-success mb-2">
+                            <strong>Assistant:</strong> {{ entry.message }}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info mb-2">Hello! How can I help you with our parks?</div>
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            <form method="POST" action="{{ url_for('chat_page') }}" class="d-flex">
+                <input type="text" name="user_question" class="form-control me-2" placeholder="Write your question here..." required>
+                <button type="submit" class="btn btn-primary" style="background-color: #5fb979; border-color: #5fb979;">Send</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
